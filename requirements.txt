@@ -38,7 +38,8 @@ django-dotenv
 django-environ
 django-import-export
 django-jazzmin
-django-recaptcha
+
+django-recaptcha==3.0.0
 django-rest-auth
 django-rest-framework
 django-six
@@ -79,7 +80,7 @@ packaging
 proglog
 proto-plus
 protobuf
-
+psycopg2
 pyasn1
 pyasn1-modules
 pycountry

@@ -307,14 +307,14 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 # Email configuration settings
 EMAIL_HOST = env('EMAIL_HOST')
-EMAIL_PORT = env('EMAIL_PORT', cast=int)
+EMAIL_PORT = env('EMAIL_PORT', cast=int, default=465)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 EMAIL_USE_SSL = True
 
 FROM_EMAIL = 'Mart9ja Admin <hizeetech@gmail.com>'
 DEFAULT_FROM_EMAIL = 'Mart9ja Admin <hizeetech@gmail.com>'
-ADMIN_EMAIL = 'Mart9ja Admin <hizeetech@gmail.com>'
+ADMIN_EMAIL = 'hizeetech@gmail.com>'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

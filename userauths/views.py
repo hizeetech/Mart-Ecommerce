@@ -2,17 +2,125 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
+
 from django.contrib.auth.decorators import login_required
 
 from userauths import models as userauths_models
 from userauths import forms as userauths_forms
 from vendor import models as vendor_models
 from .utils import check_role_customer, check_role_vendor, redirect_by_user_type, customer_required, vendor_required
-
 from django.core.mail import send_mail
 from django.conf import settings
 
+
+
 def register_view(request):
+    if request.user.is_authenticated:
+        messages.warning(request, "You are already logged in")
+        return redirect(redirect_by_user_type(request.user))
+
+    form = userauths_forms.UserRegisterForm(request.POST or None, request.FILES or None)
+
+    if form.is_valid():
+        try:
+            user = form.save()
+            full_name = form.cleaned_data.get('full_name')
+            email = form.cleaned_data.get('email')
+            mobile = form.cleaned_data.get('mobile')
+            user_type = form.cleaned_data.get("user_type")
+            vendor_license = form.cleaned_data.get("vendor_license")
+
+            profile = userauths_models.Profile.objects.create(
+                full_name=full_name,
+                mobile=mobile,
+                user=user,
+                user_type=user_type,
+                vendor_license=vendor_license if user_type == "Vendor" else None
+            )
+
+            if user_type == "Vendor":
+                vendor = vendor_models.Vendor.objects.create(
+                    user=user,
+                    store_name=full_name,
+                    is_approved=False
+                )
+
+                site_url = getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000')
+
+                # Notify admin
+                try:
+                    admin_subject = f"New Vendor Approval Request: {full_name}"
+                    admin_message = f"""
+                    A new vendor {full_name} has registered and is awaiting approval.
+
+                    License: {vendor_license}
+
+                    Review: {site_url}/admin/vendor/vendor/{vendor.id}/change/
+                    """
+                    send_mail(
+                        admin_subject,
+                        admin_message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [settings.ADMIN_EMAIL],
+                        fail_silently=True,
+                    )
+                    print(f"Admin notification sent for new vendor: {full_name} ({email})")
+                except Exception as e:
+                    print(f"Failed to send admin email for vendor {full_name}: {e}")
+
+                # Notify vendor
+                try:
+                    vendor_subject = "Vendor Account Pending Approval"
+                    vendor_message = "Thank you for registering as a vendor. Your account is pending admin approval. You will receive an email notification once your account has been reviewed."
+                    send_mail(
+                        vendor_subject,
+                        vendor_message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [email],
+                        fail_silently=True,
+                    )
+                    print(f"Vendor pending approval email sent to: {email}")
+                except Exception as e:
+                    print(f"Failed to send vendor pending approval email to {email}: {e}")
+
+                messages.info(request, "Your vendor account is pending admin approval. You will receive an email notification upon review.")
+                return redirect('userauths:sign-in')
+            else:
+                # Regular user flow
+                user = authenticate(email=email, password=form.cleaned_data.get('password1'))
+                if user is not None:
+                    login(request, user)
+                    messages.success(request, "Account created successfully!")
+
+                    # Send welcome email to customer
+                    try:
+                        customer_subject = "Welcome to Our Platform!"
+                        customer_message = "Thank you for registering with us!"
+                        send_mail(
+                            customer_subject,
+                            customer_message,
+                            settings.DEFAULT_FROM_EMAIL,
+                            [email],
+                            fail_silently=True,
+                        )
+                        print(f"Welcome email sent to customer: {email}")
+                    except Exception as e:
+                        print(f"Failed to send welcome email to customer {email}: {e}")
+
+                    return redirect(redirect_by_user_type(user))
+                else:
+                    messages.error(request, "Authentication failed after registration. Please try logging in.")
+                    return redirect('userauths:sign-in')
+
+        except Exception as e:
+            messages.error(request, f"An error occurred during registration: {str(e)}")
+            print(f"Registration error: {e}") # Log the full error for debugging
+            return redirect('userauths:sign-up')
+
+    context = {'form': form}
+    return render(request, 'userauths/sign-up.html', context)
+
+''' def register_view(request):
     if request.user.is_authenticated:
         messages.warning(request, "You are already logged in")
         return redirect(redirect_by_user_type(request.user))
@@ -96,7 +204,7 @@ def register_view(request):
             return redirect('userauths:sign-up')
     
     context = {'form': form}
-    return render(request, 'userauths/sign-up.html', context)
+    return render(request, 'userauths/sign-up.html', context) '''
 
 def login_view(request):
     if request.user.is_authenticated:
